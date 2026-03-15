@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 
 
 
@@ -26,3 +27,27 @@ nba_shots = pd.concat(all_shotdata, ignore_index=True)
 
 print(nba_shots.head())
 print(nba_shots.shape)
+
+
+num_shots = nba_shots["made"].sum()      # 2,097,374
+num_games = nba_shots["match_id"].count()  # 4,613,003
+shots_per_player = nba_shots['player'].value_counts().head(10)
+
+#LeBron James         32223
+#Kobe Bryant          26642
+#Dirk Nowitzki        24883
+#Carmelo Anthony      24139
+#Russell Westbrook    21210
+#Dwyane Wade          20604
+#Kevin Durant         20498
+#Tim Duncan           20413
+#Vince Carter         20101
+#Paul Pierce          20091
+
+shot_types = nba_shots["shot_type"].unique() #2s and 3s only
+
+
+print(f"Number of shots:", num_shots)
+print(f"Number of games:", num_games)
+print(f"Total Shots per Player:", shots_per_player)
+print(f"Shots Types:", shot_types)
