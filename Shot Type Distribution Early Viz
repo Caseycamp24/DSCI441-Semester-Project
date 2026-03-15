@@ -1,0 +1,95 @@
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+
+
+
+#see what headers and variables we have available
+
+folder = r"C:\Users\casey\.cache\kagglehub\datasets\techbaron13\nba-shots-dataset-2001-present\versions\2\nba"
+
+all_shotdata = []
+
+for file in os.listdir(folder):
+    if file.endswith(".csv"):
+        path = os.path.join(folder, file)
+
+        df = pd.read_csv(path)
+
+        # remove unnecessary index columns
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+        all_shotdata.append(df)
+
+# combine into one df
+nba_shots = pd.concat(all_shotdata, ignore_index=True)
+
+
+
+#shot type
+
+shot_counts = nba_shots["shot_type"].value_counts()
+
+plt.figure(figsize=(8, 5))
+shot_counts.plot(kind="bar")
+plt.xlabel("Shot Type")
+plt.ylabel("Count")
+plt.title("Shot Type Frequency")
+plt.xticks(rotation=0)
+plt.show()
+
+
+
+#1st qtr dist
+first_qtr = nba_shots[nba_shots["quarter"] == "1st quarter"]
+
+shot_counts = first_qtr["shot_type"].value_counts()
+
+plt.figure(figsize=(8, 5))
+shot_counts.plot(kind="bar")
+plt.xlabel("Shot Type")
+plt.ylabel("Count")
+plt.title("1st Quarter Shot Type Frequency")
+plt.xticks(rotation=0)
+plt.show()
+
+
+#2nd qtr dist
+second_qtr = nba_shots[nba_shots["quarter"] == "2nd quarter"]
+
+shot_counts = second_qtr["shot_type"].value_counts()
+
+plt.figure(figsize=(8, 5))
+shot_counts.plot(kind="bar")
+plt.xlabel("Shot Type")
+plt.ylabel("Count")
+plt.title("2nd Quarter Shot Type Frequency")
+plt.xticks(rotation=0)
+plt.show()
+
+#3rd qtr dist
+third_qtr = nba_shots[nba_shots["quarter"] == "3rd quarter"]
+
+shot_counts = third_qtr["shot_type"].value_counts()
+
+plt.figure(figsize=(8, 5))
+shot_counts.plot(kind="bar")
+plt.xlabel("Shot Type")
+plt.ylabel("Count")
+plt.title("3rd Quarter Shot Type Frequency")
+plt.xticks(rotation=0)
+plt.show()
+
+
+#4th qtr dist
+fourth_qtr =  nba_shots[nba_shots["quarter"] == "4th quarter"]
+
+shot_counts = fourth_qtr["shot_type"].value_counts()
+
+plt.figure(figsize=(8, 5))
+shot_counts.plot(kind="bar")
+plt.xlabel("Shot Type")
+plt.ylabel("Count")
+plt.title("4th Quarter Shot Type Frequency")
+plt.xticks(rotation=0)
+plt.show()
