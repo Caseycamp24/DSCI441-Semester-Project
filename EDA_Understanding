@@ -1,0 +1,28 @@
+import pandas as pd
+import os
+
+
+
+#see what headers and variables we have available
+
+folder = r"C:\Users\casey\.cache\kagglehub\datasets\techbaron13\nba-shots-dataset-2001-present\versions\2\nba"
+
+all_shotdata = []
+
+for file in os.listdir(folder):
+    if file.endswith(".csv"):
+        path = os.path.join(folder, file)
+
+        df = pd.read_csv(path)
+
+        # remove unnecessary index columns
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+        all_shotdata.append(df)
+
+# combine into one df
+nba_shots = pd.concat(all_shotdata, ignore_index=True)
+
+
+print(nba_shots.head())
+print(nba_shots.shape)
