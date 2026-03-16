@@ -1,0 +1,72 @@
+import pandas as pd
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+
+
+
+#see what headers and variables we have available
+
+folder = r"C:\Users\casey\.cache\kagglehub\datasets\techbaron13\nba-shots-dataset-2001-present\versions\2\nba"
+
+all_shotdata = []
+
+for file in os.listdir(folder):
+    if file.endswith(".csv"):
+        path = os.path.join(folder, file)
+
+        df = pd.read_csv(path)
+
+        # remove unnecessary index columns
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+        all_shotdata.append(df)
+
+# combine into one df
+nba_shots = pd.concat(all_shotdata, ignore_index=True)
+
+
+
+# fit log model
+nba_shots["distance_sq"] = nba_shots["distance"]**2
+
+X = nba_shots[["distance"]]
+y = nba_shots["made"]
+
+model = LogisticRegression()
+model.fit(X, y)
+
+model = LogisticRegression()
+model.fit(X, y)
+
+# prediction probs
+distance_range = np.linspace(
+    nba_shots["distance"].min(),
+    nba_shots["distance"].max(),
+    200
+)
+
+pred_df = pd.DataFrame({
+    "distance": distance_range
+})
+
+probs = model.predict_proba(pred_df)[:,1]
+
+# bins for actual FG%
+nba_shots["distance_bin"] = pd.cut(nba_shots["distance"], bins=15)
+
+bin_fg = nba_shots.groupby("distance_bin", observed=False)["made"].mean()
+bin_dist = nba_shots.groupby("distance_bin", observed=False)["distance"].mean()
+
+# plot
+plt.figure(figsize=(8, 5))
+
+plt.scatter(bin_dist, bin_fg, s=60, label="Actual FG%")
+plt.plot(distance_range, probs, color="red", linewidth=3, label="Logistic Model")
+
+plt.xlabel("Shot Distance (ft)")
+plt.ylabel("Field Goal %")
+plt.title("Shot Make Probability vs Distance")
+plt.legend()
+plt.show()
