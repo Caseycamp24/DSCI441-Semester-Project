@@ -1,0 +1,73 @@
+#Gaussian Smoothing
+
+fg_smooth = gaussian_filter(fg_grid, sigma=1.5)
+
+plot_df = sg_df.copy()
+
+# define bins
+x_bins = np.linspace(-25, 25, 60)
+y_bins = np.linspace(-2, 47, 60)
+
+# bin coordinates
+plot_df["x_bin"] = pd.cut(plot_df["shotX_centered"], bins=x_bins, labels=False, include_lowest=True)
+plot_df["y_bin"] = pd.cut(plot_df["shotY_centered"], bins=y_bins, labels=False, include_lowest=True)
+
+# drop shots that fall outside bins
+plot_df = plot_df.dropna(subset=["x_bin", "y_bin"]).copy()
+plot_df["x_bin"] = plot_df["x_bin"].astype(int)
+plot_df["y_bin"] = plot_df["y_bin"].astype(int)
+
+# make full grids
+n_y = len(y_bins) - 1
+n_x = len(x_bins) - 1
+
+makes_grid = np.zeros((n_y, n_x))
+attempts_grid = np.zeros((n_y, n_x))
+
+# fill grids
+for _, row in plot_df.iterrows():
+    yb = row["y_bin"]
+    xb = row["x_bin"]
+    attempts_grid[yb, xb] += 1
+    makes_grid[yb, xb] += int(row["made"])
+
+# smooth both grids separately
+sigma = 2
+makes_smooth = gaussian_filter(makes_grid, sigma=sigma)
+attempts_smooth = gaussian_filter(attempts_grid, sigma=sigma)
+
+# no divide-by-zero
+fg_smooth = np.divide(
+    makes_smooth,
+    attempts_smooth,
+    out=np.full_like(makes_smooth, np.nan, dtype=float),
+    where=attempts_smooth > 0.05
+)
+
+# masks very low smoothed attempt areas
+fg_smooth[attempts_smooth < 0.5] = np.nan
+
+# plot
+fig, ax = plt.subplots(figsize=(8, 7))
+
+im = ax.imshow(
+    fg_smooth,
+    origin="lower",
+    extent=[x_bins.min(), x_bins.max(), y_bins.min(), y_bins.max()],
+    aspect="auto",
+    cmap="RdBu_r",
+    alpha=0.9,
+    vmin=0.3,
+    vmax=0.7
+)
+
+draw_court(ax=ax, color="black", lw=2)
+
+cbar = plt.colorbar(im, ax=ax)
+cbar.set_label("Field Goal %")
+
+ax.set_title("Splash Bros Shot Efficiency (Smoothed)")
+ax.set_xlabel("Court X")
+ax.set_ylabel("Court Y")
+
+plt.show()
