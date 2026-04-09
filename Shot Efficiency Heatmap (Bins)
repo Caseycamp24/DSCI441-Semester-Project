@@ -1,0 +1,42 @@
+sg_df = full_df[full_df["player"].isin(sg_players)].copy()
+
+plot_df = sg_df.copy()
+
+x_bins = np.linspace(-25, 25, 50)
+y_bins = np.linspace(-2, 47, 50)
+
+plot_df["x_bin"] = pd.cut(plot_df["shotX_centered"], bins=x_bins, labels=False, include_lowest=True)
+plot_df["y_bin"] = pd.cut(plot_df["shotY_centered"], bins=y_bins, labels=False, include_lowest=True)
+
+heatmap_df = (
+    plot_df.groupby(["y_bin", "x_bin"])
+    .agg(fg_pct=("made", "mean"), attempts=("made", "size"))
+    .reset_index()
+)
+
+heatmap_df.loc[heatmap_df["attempts"] < 5, "fg_pct"] = np.nan
+
+fg_grid = heatmap_df.pivot(index="y_bin", columns="x_bin", values="fg_pct")
+
+#fig, ax = plt.subplots(figsize=(8, 7))
+
+#im = ax.imshow(
+#    fg_grid,
+#    origin="lower",
+#    extent=[x_bins.min(), x_bins.max(), y_bins.min(), y_bins.max()],
+#    aspect="auto",
+#    cmap="coolwarm",
+#    alpha=0.8,
+#   vmin=0.3,
+#   vmax=0.7
+#)
+
+#draw_court(ax=ax, color="black", lw=2)
+
+#cbar = plt.colorbar(im, ax=ax)
+#cbar.set_label("Field Goal %")
+
+#ax.set_title("SG Shot Efficiency Heatmap (Kobe)")
+#ax.set_xlabel("Court X")
+#ax.set_ylabel("Court Y")
+#plt.show()
