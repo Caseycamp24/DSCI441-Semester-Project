@@ -1,0 +1,34 @@
+#CLEANING
+
+path = r"C:\Users\casey\.cache\kagglehub\datasets\techbaron13\nba-shots-dataset-2001-present\versions\2\nba"
+
+csv_files = [f for f in os.listdir(path) if f.endswith(".csv")]
+
+full_df = pd.concat(
+    (pd.read_csv(os.path.join(path, f)).assign(source_file=f) for f in csv_files),
+    ignore_index=True
+)
+
+# drop unnamed columns
+full_df = full_df.loc[:, ~full_df.columns.str.contains("^Unnamed")]
+
+
+#convert made from bool to int
+full_df["made"] = full_df["made"].astype(int)
+
+#make sure everything numeric is numeric
+full_df["made"] = pd.to_numeric(full_df["made"], errors="coerce")
+full_df["distance"] = pd.to_numeric(full_df["distance"], errors="coerce")
+full_df["shotX"] = pd.to_numeric(full_df["shotX"], errors="coerce")
+full_df["shotY"] = pd.to_numeric(full_df["shotY"], errors="coerce")
+
+#make sure that everything that should be a str is a str
+full_df["team"] = full_df["team"].astype(str).str.replace("'", "", regex=False)
+full_df["opp"] = full_df["opp"].astype(str).str.replace("'", "", regex=False)
+
+#ensure distance is sqrd
+full_df["distance_sq"] = full_df["distance"] ** 2
+
+#print(full_df.dtypes)
+#print(full_df.isnull().sum())
+#print(full_df.head())
