@@ -254,7 +254,7 @@ _DTYPE_MAP = {
  
 # On Streamlit Cloud (≤1 GB RAM) sample down to keep memory safe.
 # Set to 1.0 locally if you want all rows.
-_CLOUD_SAMPLE_FRAC = 0.1  # use 5 % of rows on the cloud — still millions of shots
+_CLOUD_SAMPLE_FRAC = 0.02 # use 2 % of rows on the cloud — still millions of shots
  
 def _is_cloud() -> bool:
     """True when running on Streamlit Community Cloud."""
@@ -495,7 +495,7 @@ with tab2:
  
     # ── Bootstrap ────────────────────────────────────────────────────────────
     st.subheader("Bootstrap Reliability Check")
-    n_boot_slider = st.slider("Bootstrap iterations", 50, 300, 100, step=50)
+    n_boot_slider = st.slider("Bootstrap iterations", 10, 100, 25, step=25)
  
     @st.cache_data(show_spinner="Running bootstrap…")
     def run_bootstrap(made_arr_bytes, bin_codes_bytes, n_bins_total, n_boot, dist_mids_bytes):
