@@ -1,0 +1,63 @@
+"""
+NBA Bayesian Shots — Court Heatmaps & 2030 Projections
+Run AFTER nba_main_cleaned.py in the same Spyder kernel.
+Uses: full_df, draw_court, dist_edges (all defined in the main script).
+"""
+
+
+# =============================================================================
+# SETUP
+# =============================================================================
+print("Available columns:", list(full_df.columns))
+
+if "season_start" not in full_df.columns:
+    s = full_df["source_file"].astype(str).str.extract(r"(\d{4})", expand=False)
+    full_df["season_start"] = pd.to_numeric(s, errors="coerce")
+if "era" not in full_df.columns:
+    full_df["era"] = np.where(full_df["season_start"] >= 2014, "2014+", "pre-2014")
+
+
+def shot_court_heatmap(df, ax, kind="attempts", cmap="Reds",
+                       vmin=None, vmax=None, sigma=2, n_bins=60,
+                       title="", min_density=0.1):
+    x_bins = np.linspace(-25, 25, n_bins)
+    y_bins = np.linspace(-2, 47, n_bins)
+
+    x_b = pd.cut(df["shotX_centered"], bins=x_bins, labels=False, include_lowest=True)
+    y_b = pd.cut(df["shotY_centered"], bins=y_bins, labels=False, include_lowest=True)
+    mask = ~(x_b.isna() | y_b.isna())
+    x_b = x_b[mask].astype(int).values
+    y_b = y_b[mask].astype(int).values
+    made = df.loc[mask.values, "made"].values
+
+    n_y, n_x = n_bins - 1, n_bins - 1
+    attempts_grid = np.zeros((n_y, n_x))
+    makes_grid    = np.zeros((n_y, n_x))
+    np.add.at(attempts_grid, (y_b, x_b), 1)
+    np.add.at(makes_grid,    (y_b, x_b), made)
+
+    if kind == "attempts":
+        grid = gaussian_filter(attempts_grid, sigma=sigma)
+        grid[grid < min_density] = np.nan
+    elif kind == "makes":
+        grid = gaussian_filter(makes_grid, sigma=sigma)
+        grid[grid < min_density] = np.nan
+    elif kind == "fg_pct":
+        att = gaussian_filter(attempts_grid, sigma=sigma)
+        mk  = gaussian_filter(makes_grid,    sigma=sigma)
+        grid = np.divide(mk, att, out=np.full_like(mk, np.nan), where=att > 0.05)
+        grid[att < 0.5] = np.nan
+    else:
+        raise ValueError(f"Unknown kind: {kind}")
+
+
+    im = ax.imshow(
+        grid, origin="lower",
+        extent=[x_bins.min(), x_bins.max(), y_bins.min(), y_bins.max()],
+        aspect="auto", cmap=cmap, alpha=0.85,
+        )
+    draw_court(ax=ax, color="black", lw=2)
+    ax.set_title(title)
+    ax.set_xlabel("Court X")
+    ax.set_ylabel("Court Y")
+    return im
