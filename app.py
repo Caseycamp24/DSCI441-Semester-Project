@@ -707,41 +707,6 @@ with tab4:
             st.dataframe(player_3pt.head(50).round(3))
     else:
         st.warning("Player or distance column not found.")
-
-    st.subheader("Elite Scorers (>20 PPG estimate)")
-    PPG_THRESHOLD = st.slider("PPG threshold", 10, 30, 20, key="ppg_thresh")
-    MIN_TOTAL_SHOTS = st.slider("Min total shots", 200, 5000, 1000, step=100, key="min_shots")
-
-    full_df["is_three"] = (
-        ((full_df["shotX_centered"].abs() >= 22) & (full_df["shotY_centered"] <= 14))
-        | (full_df["distance"] >= 23.75)
-    )
-    full_df["points_value"] = np.where(full_df["is_three"], 3, 2)
-    full_df["points"] = full_df["made"] * full_df["points_value"]
-
-    GAME_CANDIDATES = ["match_id", "game_id", "game", "game_date", "date", "matchup_id", "GAME_ID"]
-    game_col = next((c for c in GAME_CANDIDATES if c in full_df.columns), None)
-
-    if game_col:
-        ppg = full_df.groupby("player").agg(
-            total_pts=("points", "sum"),
-            games=(game_col, "nunique"),
-            total_shots=("made", "size"),
-        )
-    else:
-        ppg = full_df.groupby("player").agg(
-            total_pts=("points", "sum"),
-            total_shots=("made", "size"),
-        )
-        ppg["games"] = ppg["total_shots"] / 10
-
-    ppg["ppg"] = ppg["total_pts"] / ppg["games"]
-    elite = ppg[
-        (ppg["ppg"] > PPG_THRESHOLD) & (ppg["total_shots"] >= MIN_TOTAL_SHOTS)
-    ].sort_values("ppg", ascending=False)
-
-    st.metric("Players above threshold", len(elite))
-    st.dataframe(elite.head(20).round(2))
  
     # ── Elite scorers (>20 PPG) ───────────────────────────────────────────────
     st.subheader("Elite Scorers (>20 PPG estimate)")
