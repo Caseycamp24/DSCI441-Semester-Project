@@ -654,54 +654,94 @@ with tab3:
 # ═════════════════════════════════════════════════════════════════════════════
 with tab4:
     st.header("Player Rankings")
- 
-    # ── Three-point shooters ─────────────────────────────────────────────────
+
     st.subheader("Top Three-Point Shooters (22–26 ft)")
-    min_attempts = st.slider("Minimum attempts", 100, 2000, 1000, step=100, key="3pt_min")
- 
-    @st.cache_data(show_spinner="Computing 3PT rankings…")
-    def compute_3pt_rankings(df_made_json, min_att):
-        df = pd.read_json(df_made_json, orient="split")
-        p = (
-            df[df["distance"].between(22, 26)]
+    min_attempts = st.slider("Minimum attempts", 50, 1000, 300, step=50, key="3pt_min")
+
+    needed_3pt_cols = ["player", "distance", "made"]
+
+    if all(c in full_df.columns for c in needed_3pt_cols):
+        df_3pt = full_df[needed_3pt_cols]
+
+        player_3pt = (
+            df_3pt[df_3pt["distance"].between(22, 26)]
             .groupby("player")
             .agg(attempts=("made", "size"), makes=("made", "sum"))
-            .query(f"attempts >= {min_att}")
+            .query("attempts >= @min_attempts")
             .copy()
         )
-        p["post_mean"] = (1 + p["makes"]) / (2 + p["attempts"])
-        p["ci_lower"]  = beta.ppf(0.025, 1 + p["makes"], 1 + p["attempts"] - p["makes"])
-        p["ci_upper"]  = beta.ppf(0.975, 1 + p["makes"], 1 + p["attempts"] - p["makes"])
-        return p.sort_values("post_mean", ascending=False)
- 
-    needed_3pt_cols = ["player", "distance", "made"]
-    if all(c in full_df.columns for c in needed_3pt_cols):
-        player_3pt = compute_3pt_rankings(
-            full_df[needed_3pt_cols].to_json(orient="split"), min_attempts
+
+        player_3pt["post_mean"] = (1 + player_3pt["makes"]) / (2 + player_3pt["attempts"])
+        player_3pt["ci_lower"] = beta.ppf(
+            0.025,
+            1 + player_3pt["makes"],
+            1 + player_3pt["attempts"] - player_3pt["makes"]
         )
- 
+        player_3pt["ci_upper"] = beta.ppf(
+            0.975,
+            1 + player_3pt["makes"],
+            1 + player_3pt["attempts"] - player_3pt["makes"]
+        )
+
+        player_3pt = player_3pt.sort_values("post_mean", ascending=False)
+
         top_n = st.slider("Show top N players", 10, 30, 20)
         top_k = player_3pt.head(top_n)
- 
+
         fig, ax = plt.subplots(figsize=(10, max(5, top_n // 2 + 2)))
         ax.barh(
             top_k.index[::-1], top_k["post_mean"][::-1],
             xerr=[
                 top_k["post_mean"][::-1] - top_k["ci_lower"][::-1],
-                top_k["ci_upper"][::-1]  - top_k["post_mean"][::-1],
+                top_k["ci_upper"][::-1] - top_k["post_mean"][::-1],
             ],
             color="C3", alpha=0.8, capsize=4,
         )
         ax.set_xlabel("Posterior FG% (22–26 ft)")
-        ax.set_title(f"Top {top_n} Three-Point Shooters — Bayesian Estimate (min {min_attempts} attempts)")
+        ax.set_title(f"Top {top_n} Three-Point Shooters — Bayesian Estimate")
         plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
- 
+
         with st.expander("Full table"):
             st.dataframe(player_3pt.head(50).round(3))
     else:
         st.warning("Player or distance column not found.")
+
+    st.subheader("Elite Scorers (>20 PPG estimate)")
+    PPG_THRESHOLD = st.slider("PPG threshold", 10, 30, 20, key="ppg_thresh")
+    MIN_TOTAL_SHOTS = st.slider("Min total shots", 200, 5000, 1000, step=100, key="min_shots")
+
+    full_df["is_three"] = (
+        ((full_df["shotX_centered"].abs() >= 22) & (full_df["shotY_centered"] <= 14))
+        | (full_df["distance"] >= 23.75)
+    )
+    full_df["points_value"] = np.where(full_df["is_three"], 3, 2)
+    full_df["points"] = full_df["made"] * full_df["points_value"]
+
+    GAME_CANDIDATES = ["match_id", "game_id", "game", "game_date", "date", "matchup_id", "GAME_ID"]
+    game_col = next((c for c in GAME_CANDIDATES if c in full_df.columns), None)
+
+    if game_col:
+        ppg = full_df.groupby("player").agg(
+            total_pts=("points", "sum"),
+            games=(game_col, "nunique"),
+            total_shots=("made", "size"),
+        )
+    else:
+        ppg = full_df.groupby("player").agg(
+            total_pts=("points", "sum"),
+            total_shots=("made", "size"),
+        )
+        ppg["games"] = ppg["total_shots"] / 10
+
+    ppg["ppg"] = ppg["total_pts"] / ppg["games"]
+    elite = ppg[
+        (ppg["ppg"] > PPG_THRESHOLD) & (ppg["total_shots"] >= MIN_TOTAL_SHOTS)
+    ].sort_values("ppg", ascending=False)
+
+    st.metric("Players above threshold", len(elite))
+    st.dataframe(elite.head(20).round(2))
  
     # ── Elite scorers (>20 PPG) ───────────────────────────────────────────────
     st.subheader("Elite Scorers (>20 PPG estimate)")
