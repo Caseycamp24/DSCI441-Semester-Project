@@ -13,12 +13,14 @@ Key analyses include:
 Bayesian FG% by distance: Beta-Binomial conjugate model with 95%
 credible intervals, showing how shot-make probability declines with
 distance and where the inflection points are.
+
 Bootstrap reliability check: Vectorized bootstrap resampling to
 cross-validate the Bayesian credible intervals.
 Bayesian change-point detection: Grid search over joint log marginal
 likelihood to identify the MAP change-point in FG% by distance
 (found consistently at ~5 ft, the boundary between layup and
 jump-shot efficiency).
+
 Expected Points (EP) analysis: Combines posterior FG% with point
 value (2 or 3) to find the stop-shooting threshold (~27 ft) beyond
 which shots yield less than the league average of ~1.01 pts/shot.
@@ -26,20 +28,25 @@ Era analysis (pre-2014 vs. 2014+): Compares FG%, expected points,
 shot distribution, and change-points across the analytics revolution
 split, showing how post-2014 players extract more value from
 3-point range.
+
 Court heatmaps: Gaussian-smoothed FG% heatmaps by court zone,
 including Splash Bros (Stephen Curry & Klay Thompson) efficiency
 profiles and pre/post-2014 era comparisons.
 Player rankings: Bayesian posterior FG% estimates for three-point
 shooters (22-26 ft, min. 1,000 attempts), with credible intervals
 to reflect uncertainty rather than raw sample percentages.
+
 Clutch analysis: FG% by court zone in the final 5 minutes of Q4
 for elite scorers (>20 PPG, post-2014), finding that elite players
 do not shift zones under pressure.
+
 Time-of-quarter heatmaps: Posterior FG% by distance and minute of
 quarter across all four quarters.
+
 2030 FG% projections: Linear extrapolation of per-season posterior
 estimates with 95% extrapolation bands (directional trend indicator,
 not a forecast).
+
 Calibration & out-of-sample validation: Temporal train/test split
 on held-out seasons, Brier score, log-loss, and a calibration plot
 to confirm the model is well-calibrated across the FG% range.
@@ -48,6 +55,7 @@ The project is delivered in two forms: a Python script (dsci441proj.py)
 that contains all compiled analysis code and can be run top-to-bottom
 in Spyder, and an interactive Streamlit web application (app.py) with
 eight tabs covering each analysis area.
+
 DATA SOURCE
 Dataset:  NBA Shots Dataset 2001-Present
 Source:   Kaggle -- techbaron13/nba-shots-dataset-2001-present
@@ -62,6 +70,8 @@ player          Player name
 quarter         Quarter of the game
 time_remaining  Time left in the quarter (MM:SS)
 season / date   Used to assign season year
+
+
 Downloading the Data:
 Locally -- Download via kagglehub or the Kaggle CLI:
 pip install kagglehub
@@ -71,6 +81,8 @@ The data will be cached at:
 On Streamlit Cloud -- The app downloads the dataset automatically on
 first run using your Kaggle API credentials (see deployment instructions
 below).
+
+
 REQUIRED PACKAGES
 Install all dependencies with:
 pip install -r requirements.txt
@@ -82,6 +94,7 @@ matplotlib>=3.7.0
 seaborn>=0.12.0
 scipy>=1.11.0
 kagglehub>=0.2.0
+
 Package descriptions:
 streamlit    Web application framework
 pandas       Data loading and manipulation
