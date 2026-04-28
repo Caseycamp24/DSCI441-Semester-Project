@@ -1,5 +1,7 @@
 NBA Bayesian Shots Analysis
+
 Casey Campbell | Statistical & Machine Learning | 2026
+
 PROJECT DESCRIPTION
 This project applies Bayesian statistical modeling to a comprehensive
 shot-by-shot NBA dataset spanning 2000-2022. The goal is to move beyond
