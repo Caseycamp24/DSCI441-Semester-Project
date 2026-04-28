@@ -1,0 +1,202 @@
+# =============================================================================
+# 1) PRE-2014 vs 2014+ SHOT VOLUME HEATMAPS
+# =============================================================================
+fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+for ax, era in zip(axes, ["pre-2014", "2014+"]):
+    sub = full_df[full_df["era"] == era]
+    im = shot_court_heatmap(
+        sub, ax=ax, kind="fg_pct",     # ← was "attempts"
+        cmap="RdBu_r", sigma=4,
+        vmin=0.3, vmax=0.7,
+        title=f"FG% — {era}  (n={len(sub):,})",
+    )
+    plt.colorbar(im, ax=ax, label="Attempt density (smoothed)")
+plt.tight_layout()
+plt.show()
+
+
+# =============================================================================
+# 2) IDENTIFY PLAYERS AVERAGING >20 PPG
+# =============================================================================
+full_df["is_three"] = (
+    ((full_df["shotX_centered"].abs() >= 22) & (full_df["shotY_centered"] <= 14))
+    | (full_df["distance"] >= 23.75)
+)
+full_df["points_value"] = np.where(full_df["is_three"], 3, 2)
+full_df["points"]       = full_df["made"] * full_df["points_value"]
+
+GAME_CANDIDATES = ["match_id", "game_id", "game", "game_date", "date", "matchup_id", "GAME_ID"]
+game_col = next((c for c in GAME_CANDIDATES if c in full_df.columns), None)
+
+if game_col:
+    print(f"Counting games using `{game_col}`.")
+    ppg = (
+        full_df.groupby("player")
+        .agg(total_pts=("points", "sum"),
+             games=(game_col, "nunique"),
+             total_shots=("made", "size"))
+    )
+else:
+    SHOTS_PER_GAME = 10
+    print(f"No game-id column — estimating games as total_shots / {SHOTS_PER_GAME}.")
+    ppg = (
+        full_df.groupby("player")
+        .agg(total_pts=("points", "sum"),
+             total_shots=("made", "size"))
+    )
+    ppg["games"] = ppg["total_shots"] / SHOTS_PER_GAME
+
+ppg["ppg"] = ppg["total_pts"] / ppg["games"]
+
+PPG_THRESHOLD     = 20
+MIN_TOTAL_SHOTS   = 1000
+
+elite = ppg[(ppg["ppg"] > PPG_THRESHOLD) &
+            (ppg["total_shots"] >= MIN_TOTAL_SHOTS)].sort_values("ppg", ascending=False)
+elite_players = elite.index.tolist()
+
+print(f"\n{len(elite_players)} players above {PPG_THRESHOLD} PPG (min {MIN_TOTAL_SHOTS} shots).")
+print("\nTop 15 by estimated PPG:")
+print(elite.head(15)[["total_pts", "total_shots", "games", "ppg"]].round(2))
+
+
+# =============================================================================
+# 3) POST-2014 MADE-SHOT HEATMAPS BY QUARTER (ELITE SCORERS)
+# =============================================================================
+elite_post = full_df[
+    (full_df["era"] == "2014+") & (full_df["player"].isin(elite_players))
+]
+quarters = ["1st quarter", "2nd quarter", "3rd quarter", "4th quarter"]
+fig, axes = plt.subplots(2, 2, figsize=(16, 14))
+for ax, q in zip(axes.flat, quarters):
+    sub = elite_post[elite_post["quarter"] == q]  # ← full data not just made
+    im = shot_court_heatmap(
+        sub, ax=ax, kind="fg_pct", cmap="RdBu_r", sigma=2,
+        vmin=0.0, vmax=0.5,
+        title=f"{q} — FG%, elite scorers (post-2014)\nn={len(sub):,} attempts",
+    )
+    plt.colorbar(im, ax=ax, label="FG%")
+plt.tight_layout()
+plt.show()
+
+
+# =============================================================================
+# 4) CLUTCH HEATMAP — last 5 min of Q4, elite scorers (post-2014)
+# =============================================================================
+clutch = full_df[
+    (full_df["era"] == "2014+") &
+    (full_df["player"].isin(elite_players)) &
+    (full_df["quarter"] == "4th quarter") &
+    (full_df["time_sec"] <= 300)
+]
+clutch_made = clutch[clutch["made"] == 1]
+
+fig, ax = plt.subplots(figsize=(9, 8))
+im = shot_court_heatmap(
+    clutch, ax=ax, kind="fg_pct", cmap="RdBu_r", sigma=2,
+    vmin=0.0, vmax=0.5,
+    title=f"Clutch FG% — elite scorers (>{PPG_THRESHOLD} PPG)\n"
+          f"Last 5 min of Q4, post-2014 (n={len(clutch):,})",
+)
+plt.colorbar(im, ax=ax, label="FG%")
+plt.tight_layout()
+plt.show()
+
+
+# =============================================================================
+# 5) 2030 FG% PROJECTION BY DISTANCE
+# =============================================================================
+PROJECTION_YEAR = 2030
+
+per_season = (
+    full_df.dropna(subset=["season_start"])
+    .assign(dist_bin=lambda d: pd.cut(d["distance"], bins=dist_edges, right=False))
+    .groupby(["season_start", "dist_bin"], observed=False)
+    .agg(attempts=("made", "size"), makes=("made", "sum"))
+    .reset_index()
+)
+per_season["fg_pct"] = per_season["makes"] / per_season["attempts"]
+per_season = per_season[per_season["attempts"] >= 100]
+
+projection = []
+last_data_year = full_df["season_start"].max()
+data_span = full_df["season_start"].max() - full_df["season_start"].min()
+
+for bin_label, g in per_season.groupby("dist_bin", observed=True):
+    if len(g) < 5:
+        continue
+    x = g["season_start"].values.astype(float)
+    y = g["fg_pct"].values
+    if np.std(x) < 1e-6:
+        continue
+    slope, intercept = np.polyfit(x, y, 1)
+    pred = float(np.clip(slope * PROJECTION_YEAR + intercept, 0.02, 0.95))
+    residuals = y - (slope * x + intercept)
+    sigma = np.std(residuals, ddof=2) if len(g) > 2 else 0.05
+    delta = max(PROJECTION_YEAR - last_data_year, 0)
+    band  = sigma * (1 + delta / max(data_span, 1)) * 1.96
+    projection.append({
+        "dist_bin": bin_label,
+        "dist_mid": float(bin_label.left + (bin_label.right - bin_label.left) / 2),
+        "pred_2030": pred,
+        "lo": float(np.clip(pred - band, 0, 1)),
+        "hi": float(np.clip(pred + band, 0, 1)),
+        "slope": float(slope),
+    })
+
+proj_df = pd.DataFrame(projection).sort_values("dist_mid")
+
+
+def _era_summary(df, edges, alpha=1, beta_prior=1):
+    d = df[["made", "distance"]].dropna().copy()
+    d["dist_bin"] = pd.cut(d["distance"], bins=edges, right=False)
+    s = (d.groupby("dist_bin", observed=False)
+            .agg(attempts=("made", "size"), makes=("made", "sum"))
+            .reset_index())
+    s["misses"]     = s["attempts"] - s["makes"]
+    s["post_alpha"] = alpha + s["makes"]
+    s["post_beta"]  = beta_prior + s["misses"]
+    s["post_mean"]  = s["post_alpha"] / (s["post_alpha"] + s["post_beta"])
+    s["ci_lower"]   = beta.ppf(0.025, s["post_alpha"], s["post_beta"])
+    s["ci_upper"]   = beta.ppf(0.975, s["post_alpha"], s["post_beta"])
+    s["dist_mid"]   = s["dist_bin"].apply(
+        lambda b: b.left + (b.right - b.left) / 2
+    ).astype(float)
+    return s
+
+pre_s  = _era_summary(full_df[full_df["era"] == "pre-2014"], dist_edges)
+post_s = _era_summary(full_df[full_df["era"] == "2014+"],    dist_edges)
+
+fig, ax = plt.subplots(figsize=(11, 6))
+ax.plot(pre_s["dist_mid"],  pre_s["post_mean"],  lw=2, color="C0", label="pre-2014")
+ax.fill_between(pre_s["dist_mid"], pre_s["ci_lower"], pre_s["ci_upper"], alpha=0.2, color="C0")
+ax.plot(post_s["dist_mid"], post_s["post_mean"], lw=2, color="C3", label="2014+")
+ax.fill_between(post_s["dist_mid"], post_s["ci_lower"], post_s["ci_upper"], alpha=0.2, color="C3")
+ax.plot(proj_df["dist_mid"], proj_df["pred_2030"], lw=2, color="C2", ls="--",
+        label=f"{PROJECTION_YEAR} projection (linear extrapolation)")
+ax.fill_between(proj_df["dist_mid"], proj_df["lo"], proj_df["hi"],
+                alpha=0.2, color="C2", label=f"{PROJECTION_YEAR} 95% extrap. band")
+ax.set_xlabel("Distance (ft)")
+ax.set_ylabel("FG%")
+ax.set_title(f"FG% by Distance — Pre-2014, 2014+, and {PROJECTION_YEAR} Projection")
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+
+# =============================================================================
+# 6) 2030 PROJECTED FG% HEATMAP — ELITE SCORERS
+# =============================================================================
+fig, ax = plt.subplots(figsize=(10, 8))
+im = shot_court_heatmap(
+    full_df[full_df["era"] == "2014+"], ax=ax, kind="fg_pct",
+    cmap="RdBu_r", sigma=4, vmin=0.3, vmax=0.7,
+    title=f"Projected 2030 FG% by Zone — based on 2014+ trends\n"
+          f"(linear extrapolation from historical efficiency)",
+)
+plt.colorbar(im, ax=ax, label="Projected FG%")
+plt.tight_layout()
+plt.show()
+
+print("\nAll heatmaps rendered.")
+print("Caveat: 2030 projections are naive linear extrapolations, not forecasts.")
